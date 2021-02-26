@@ -38,6 +38,8 @@ arc_actions = include 'lib/arc_actions'
 rightangleslice = include 'lib/zilchmos'
 start_up = include 'lib/start_up'
 grid_actions = include 'lib/grid_actions'
+--push_action = include 'lib/push_actions'
+push = include "lib/push"
 easingFunctions = include 'lib/easing'
 arps = include 'lib/arp_actions'
 rnd = include 'lib/rnd_actions'
@@ -870,7 +872,7 @@ function init()
   end
 
   params:add_group("GRID",5)
-  params:add_option("LED_style","LED style",{"varibright","4-step","grayscale"},1)
+  params:add_option("LED_style","LED style",{"varibright","4-step","grayscale","push"},1)
   params:set_action("LED_style",
   function()
     grid_dirty = true
@@ -885,6 +887,7 @@ function init()
     if x == 2 then
       params:set("LED_style",2)
     end
+    
     if all_loaded then
       persistent_state_save()
     end
@@ -1473,100 +1476,86 @@ function init()
   midi_dev = {}
   for j = 1,#midi.vports do
     midi_dev[j] = midi.connect(j)
+
     local trigger_bank = {nil,nil,nil}
     local b_ch = {}
-    midi_dev[j].event = function(data)
-      screen_dirty = true
-      local d = midi.to_msg(data)
-      if d.type == "start" then
-        if transport.vars.midi_transport_in[j] then
-          if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
-            transport.start_from_midi_message()
-          end
-        end
-      elseif d.type == "stop" then
-        if transport.vars.midi_transport_in[j] then
-          if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
-            transport.stop_from_midi_message()
-          end
-        end
-      elseif d.type == "continue" then
-        if transport.vars.midi_transport_in[j] then
-          if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
-            if transport.is_running then
-              transport.stop_from_midi_message()
-            else
+    --if midi_dev[j].name ~= "Ableton Push 2 1" then
+    if false then
+      midi_dev[j].event = function(data)
+
+        screen_dirty = true
+        local d = midi.to_msg(data)
+        if d.type == "start" then
+          if transport.vars.midi_transport_in[j] then
+            if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
               transport.start_from_midi_message()
             end
           end
-        end
-      end
-      if params:get("midi_control_enabled") == 2 and j == params:get("midi_control_device") then
-        local received_ch;
-        -- local b_ch = {}
-        for i = 1,3 do
-          if d.ch == params:get("bank_"..i.."_midi_channel") then
-            -- received_ch = i
-            b_ch[i] = d.ch
-          else
-            b_ch[i] = nil
+        elseif d.type == "stop" then
+          if transport.vars.midi_transport_in[j] then
+            if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
+              transport.stop_from_midi_message()
+            end
+          end
+        elseif d.type == "continue" then
+          if transport.vars.midi_transport_in[j] then
+            if params:string("clock_source") == "internal" or params:string("clock_source") == "midi" then
+              if transport.is_running then
+                transport.stop_from_midi_message()
+              else
+                transport.start_from_midi_message()
+              end
+            end
           end
         end
-        for i = 1,3 do
-          if b_ch[i] ~= nil then
-        -- local i = received_ch
-            if d.note ~= nil and i ~= nil then
-              if d.note >= params:get("bank_"..i.."_pad_midi_base") and d.note <= params:get("bank_"..i.."_pad_midi_base") + (not midi_alt and 15 or 22) then
-                if not midi_alt then
-                  if d.type == "note_on" then
-                    mc.cheat(i,d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
-                    if midi_pat[i].rec == 1 and midi_pat[i].count == 0 then
-                    end
-                    midi_pattern_watch(i, d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
-                    if menu == 9 then
-                      page.arp_page_sel = i
-                      arps.momentary(i, bank[i].id, "on")
-                    end
-                  elseif d.type == "note_off" then
-                    if menu == 9 then
-                      if not arp[i].hold and page.arp_page_sel == i  then
-                        local targeted_pad = d.note-(params:get("bank_"..i.."_pad_midi_base")-1)
-                        arps.momentary(i, targeted_pad, "off")
+        if params:get("midi_control_enabled") == 2 and j == params:get("midi_control_device") then
+          local received_ch;
+          -- local b_ch = {}
+          for i = 1,3 do
+            if d.ch == params:get("bank_"..i.."_midi_channel") then
+              -- received_ch = i
+              b_ch[i] = d.ch
+            else
+              b_ch[i] = nil
+            end
+          end
+          for i = 1,3 do
+            if b_ch[i] ~= nil then
+          -- local i = received_ch
+              if d.note ~= nil and i ~= nil then
+                if d.note >= params:get("bank_"..i.."_pad_midi_base") and d.note <= params:get("bank_"..i.."_pad_midi_base") + (not midi_alt and 15 or 22) then
+                  if not midi_alt then
+                    if d.type == "note_on" then
+                      mc.cheat(i,d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
+                      if midi_pat[i].rec == 1 and midi_pat[i].count == 0 then
+                      end
+                      midi_pattern_watch(i, d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
+                      if menu == 9 then
+                        page.arp_page_sel = i
+                        arps.momentary(i, bank[i].id, "on")
+                      end
+                    elseif d.type == "note_off" then
+                      if menu == 9 then
+                        if not arp[i].hold and page.arp_page_sel == i  then
+                          local targeted_pad = d.note-(params:get("bank_"..i.."_pad_midi_base")-1)
+                          arps.momentary(i, targeted_pad, "off")
+                        end
                       end
                     end
+                  elseif midi_alt then
+                    if params:get("bank_"..i.."_midi_zilchmo_enabled") == 2 and d.type == "note_on" then
+                      mc.zilch(i,d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
+                    end
                   end
-                elseif midi_alt then
-                  if params:get("bank_"..i.."_midi_zilchmo_enabled") == 2 and d.type == "note_on" then
-                    mc.zilch(i,d.note-(params:get("bank_"..i.."_pad_midi_base")-1))
+                elseif d.note == params:get("bank_"..i.."_pad_midi_base") + 23 then
+                  if d.type == "note_on" then
+                    midi_alt = true
+                  else
+                    midi_alt = false
                   end
                 end
-              elseif d.note == params:get("bank_"..i.."_pad_midi_base") + 23 then
-                if d.type == "note_on" then
-                  midi_alt = true
-                else
-                  midi_alt = false
-                end
               end
-            end
-            if d.type == "cc" and params:get("midi_echo_enabled") == 2 then
-              if d.cc == 1 then
-                mc.move_start(bank[i][bank[i].id],d.val)
-              elseif d.cc == 2 then
-                mc.move_end(bank[i][bank[i].id],d.val)
-              elseif d.cc == 3 then
-                mc.adjust_filter(i,d.val)
-              elseif d.cc == 4 then
-                mc.adjust_pad_level(bank[i][bank[i].id],d.val)
-              end
-            end
-          end
-        end
-      elseif params:get("midi_enc_control_enabled") == 2 and j == params:get("midi_enc_control_device") then
-        -- TODO: refine this, shouldn't have to call all 3...
-        if midi_dev[j].name ~= "Midi Fighter Twister" then 
-          for i = 1,3 do
-            if d.ch == params:get("bank_"..i.."_midi_enc_channel") then
-              if d.type == "cc" then
+              if d.type == "cc" and params:get("midi_echo_enabled") == 2 then
                 if d.cc == 1 then
                   mc.move_start(bank[i][bank[i].id],d.val)
                 elseif d.cc == 2 then
@@ -1579,230 +1568,251 @@ function init()
               end
             end
           end
-        
-        elseif midi_dev[j].name == "Midi Fighter Twister" then
+        elseif params:get("midi_enc_control_enabled") == 2 and j == params:get("midi_enc_control_device") then
+          -- TODO: refine this, shouldn't have to call all 3...
+          if midi_dev[j].name ~= "Midi Fighter Twister" then 
+            for i = 1,3 do
+              if d.ch == params:get("bank_"..i.."_midi_enc_channel") then
+                if d.type == "cc" then
+                  if d.cc == 1 then
+                    mc.move_start(bank[i][bank[i].id],d.val)
+                  elseif d.cc == 2 then
+                    mc.move_end(bank[i][bank[i].id],d.val)
+                  elseif d.cc == 3 then
+                    mc.adjust_filter(i,d.val)
+                  elseif d.cc == 4 then
+                    mc.adjust_pad_level(bank[i][bank[i].id],d.val)
+                  end
+                end
+              end
+            end
           
-          -- tab.print(d)
+          elseif midi_dev[j].name == "Midi Fighter Twister" then
+            
+            -- tab.print(d)
 
-          local function check_focus_hold(id)
-            if bank[id].focus_hold == true then
-              return bank[id].focus_pad
-            else
-              return bank[id].id
+            local function check_focus_hold(id)
+              if bank[id].focus_hold == true then
+                return bank[id].focus_pad
+              else
+                return bank[id].id
+              end
             end
-          end
 
-          if d.ch == 1 or d.ch == 5 then
-            if d.cc == 0 or d.cc == 16 or d.cc == 32 then
-              local id = math.floor(d.cc/16)+1
-              encoder_actions.change_pad(bank[id][check_focus_hold(id)].bank_id, d.val == 63 and -1 or 1)
-              if bank[id].focus_hold then
-                mc.mft_redraw(bank[id][bank[id].focus_pad],"all")
-              end
-            elseif d.cc == 1 or d.cc == 17 or d.cc == 33 then
-              -- pad start point
-              local id = math.floor(d.cc/16)+1
-              local resolution = loop_enc_resolution[id] / 10
-              encoder_actions.move_start(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"start_point")
-              if bank[id].focus_hold == false then
-                encoder_actions.sc.move_start(id)
-              end
-            elseif d.cc == 2 or d.cc == 18 or d.cc == 34 then
-              -- pad end point
-              local id = math.floor(d.cc/16)+1
-              local resolution = loop_enc_resolution[id] / 10
-              encoder_actions.move_end(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"end_point")
-              if bank[id].focus_hold == false then
-                encoder_actions.sc.move_end(id)
-              end
-            elseif d.cc == 3 or d.cc == 19 or d.cc == 35 then
-              -- pad window
-              local id = math.floor(d.cc/16)+1
-              local resolution = loop_enc_resolution[id] / 10
-              encoder_actions.move_play_window(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"start_point")
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"end_point")
-              if bank[id].focus_hold == false then
-                encoder_actions.sc.move_play_window(id)
-              end
-            elseif d.cc == 4 or d.cc == 20 or d.cc == 36 then
-              --pad level
-              local id = math.floor(d.cc/16)+1
-              bank[id][check_focus_hold(id)].level = util.clamp(bank[id][check_focus_hold(id)].level+(d.val == 63 and (d.ch == 1 and -0.01 or -0.001) or (d.ch == 1 and 0.01 or 0.001)),0,2)
-              if bank[id][check_focus_hold(id)].envelope_mode == 2 or bank[id][check_focus_hold(id)].enveloped == false then
+            if d.ch == 1 or d.ch == 5 then
+              if d.cc == 0 or d.cc == 16 or d.cc == 32 then
+                local id = math.floor(d.cc/16)+1
+                encoder_actions.change_pad(bank[id][check_focus_hold(id)].bank_id, d.val == 63 and -1 or 1)
+                if bank[id].focus_hold then
+                  mc.mft_redraw(bank[id][bank[id].focus_pad],"all")
+                end
+              elseif d.cc == 1 or d.cc == 17 or d.cc == 33 then
+                -- pad start point
+                local id = math.floor(d.cc/16)+1
+                local resolution = loop_enc_resolution[id] / 10
+                print((d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
+                encoder_actions.move_start(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"start_point")
                 if bank[id].focus_hold == false then
-                  softcut.level_slew_time(id+1,1.0)
-                  softcut.level(id+1,bank[id][check_focus_hold(id)].level*bank[id].global_level)
-                  softcut.level_cut_cut(id+1,5,(bank[id][check_focus_hold(id)].left_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
-                  softcut.level_cut_cut(id+1,6,(bank[id][check_focus_hold(id)].right_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
+                  encoder_actions.sc.move_start(id)
                 end
-              end
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_level")
-            elseif d.cc == 5 or d.cc == 21 or d.cc == 37 then
-              --bank level
-              local id = math.floor(d.cc/16)+1
-              bank[id].global_level = util.clamp(bank[id].global_level+(d.val == 63 and (d.ch == 1 and -0.01 or -0.001) or (d.ch == 1 and 0.01 or 0.001)),0,2)
-              if bank[id][check_focus_hold(id)].envelope_mode == 2 or bank[id][check_focus_hold(id)].enveloped == false then
+              elseif d.cc == 2 or d.cc == 18 or d.cc == 34 then
+                -- pad end point
+                local id = math.floor(d.cc/16)+1
+                local resolution = loop_enc_resolution[id] / 10
+                encoder_actions.move_end(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"end_point")
                 if bank[id].focus_hold == false then
-                  softcut.level_slew_time(id+1,1.0)
-                  softcut.level(id+1,bank[id][check_focus_hold(id)].level*bank[id].global_level)
-                  softcut.level_cut_cut(id+1,5,(bank[id][check_focus_hold(id)].left_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
-                  softcut.level_cut_cut(id+1,6,(bank[id][check_focus_hold(id)].right_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
+                  encoder_actions.sc.move_end(id)
                 end
-              end
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"bank_level")
-            elseif d.cc == 6 or d.cc == 22 or d.cc == 38 then
-              --pad semitones
-              local id = math.floor(d.cc/16)+1
-              local current_offset = (math.log(bank[id][check_focus_hold(id)].offset)/math.log(0.5))*-12
-              current_offset = util.clamp(current_offset+(d.val == 63 and -1 or 1)/32,-1,1)
-              if current_offset > -0.0001 and current_offset < 0.0001 then
-                current_offset = 0
-              end
-              bank[id][check_focus_hold(id)].offset = math.pow(0.5, -current_offset / 12)
-              if d.ch == 5 then
-                local this_pad = check_focus_hold(id)
-                for i = 1,16 do
-                  bank[id][i].offset = bank[id][check_focus_hold(id)].offset
-                end
-              end
-              if bank[id][check_focus_hold(id)].pause == false and bank[id].id == check_focus_hold(id) then
+              elseif d.cc == 3 or d.cc == 19 or d.cc == 35 then
+                -- pad window
+                local id = math.floor(d.cc/16)+1
+                local resolution = loop_enc_resolution[id] / 10
+                encoder_actions.move_play_window(bank[id][check_focus_hold(id)], (d.val == 63 and (d.ch == 1 and -0.1 or -0.01) or (d.ch == 1 and 0.1 or 0.01))/resolution)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"start_point")
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"end_point")
                 if bank[id].focus_hold == false then
-                  softcut.rate(id+1, bank[id][check_focus_hold(id)].rate*bank[id][check_focus_hold(id)].offset)
+                  encoder_actions.sc.move_play_window(id)
                 end
-              end
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_offset")
-            elseif d.cc == 7 or d.cc == 23 or d.cc == 39 then
-              --pad rate
-              local id = math.floor(d.cc/16)+1
-              local rates ={-4,-2,-1,-0.5,-0.25,-0.125,0,0.125,0.25,0.5,1,2,4}
-              if bank[id][check_focus_hold(id)].fifth then
-                bank[id][check_focus_hold(id)].fifth = false
-              end
-              if tab.key(rates,bank[id][check_focus_hold(id)].rate) == nil then
-                bank[id][check_focus_hold(id)].rate = 1
-              end
-              bank[id][check_focus_hold(id)].rate = rates[util.clamp(tab.key(rates,bank[id][check_focus_hold(id)].rate)+(d.val == 63 and -1 or 1),1,#rates)]
-              if d.ch == 5 then
-                local this_pad = check_focus_hold(id)
-                for i = 1,16 do
-                  bank[id][i].rate = bank[id][check_focus_hold(id)].rate
-                end
-              end
-              if bank[id][check_focus_hold(id)].pause == false and bank[id].id == check_focus_hold(id) then
-                if bank[id].focus_hold == false then
-                  softcut.rate(id+1, bank[id][check_focus_hold(id)].rate*bank[id][check_focus_hold(id)].offset)
-                end
-              end
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_rate")
-            elseif d.cc == 8 or d.cc == 24 or d.cc == 40 then
-              --pad / bank pan
-              local id = math.floor(d.cc/16)+1
-              if d.ch == 5 then
-                local pre_pan = bank[id][check_focus_hold(id)].pan
-                for i = 1,16 do
-                  bank[id][i].pan = util.clamp(pre_pan+(d.val == 63 and -0.01 or 0.01),-1,1)
-                end
-              elseif d.ch == 1 then
-                bank[id][check_focus_hold(id)].pan = util.clamp(bank[id][check_focus_hold(id)].pan+(d.val == 63 and -0.01 or 0.01),-1,1)
-              end
-              softcut.pan(id+1, bank[id][check_focus_hold(id)].pan)
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"pan")
-            elseif d.cc == 10 or d.cc == 26 or d.cc == 42 then
-              --bank / pad filter cutoff
-              local id = math.floor(d.cc/16)+1
-              if d.ch == 5 then
-                if slew_counter[id] ~= nil then
-                  slew_counter[id].prev_tilt = bank[id][check_focus_hold(id)].tilt
-                end
-                bank[id][check_focus_hold(id)].tilt = util.clamp(bank[id][check_focus_hold(id)].tilt+(d.val == 63 and -0.01 or 0.01),-1,1)
-                if d.val == 63 then
-                  if util.round(bank[id][check_focus_hold(id)].tilt*100) < 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) > -9 then
-                    bank[id][check_focus_hold(id)].tilt = -0.10
-                  elseif util.round(bank[id][check_focus_hold(id)].tilt*100) > 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) < 32 then
-                    bank[id][check_focus_hold(id)].tilt = 0.0
+              elseif d.cc == 4 or d.cc == 20 or d.cc == 36 then
+                --pad level
+                local id = math.floor(d.cc/16)+1
+                bank[id][check_focus_hold(id)].level = util.clamp(bank[id][check_focus_hold(id)].level+(d.val == 63 and (d.ch == 1 and -0.01 or -0.001) or (d.ch == 1 and 0.01 or 0.001)),0,2)
+                if bank[id][check_focus_hold(id)].envelope_mode == 2 or bank[id][check_focus_hold(id)].enveloped == false then
+                  if bank[id].focus_hold == false then
+                    softcut.level_slew_time(id+1,1.0)
+                    softcut.level(id+1,bank[id][check_focus_hold(id)].level*bank[id].global_level)
+                    softcut.level_cut_cut(id+1,5,(bank[id][check_focus_hold(id)].left_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
+                    softcut.level_cut_cut(id+1,6,(bank[id][check_focus_hold(id)].right_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
                   end
-                elseif d.val == 65 and util.round(bank[id][check_focus_hold(id)].tilt*100) > 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) < 32 then
-                  bank[id][check_focus_hold(id)].tilt = 0.32
                 end
-                if bank[id].focus_hold == false then
-                  slew_filter(id,slew_counter[id].prev_tilt,bank[id][check_focus_hold(id)].tilt,bank[id][check_focus_hold(id)].q,bank[id][check_focus_hold(id)].q,15)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_level")
+              elseif d.cc == 5 or d.cc == 21 or d.cc == 37 then
+                --bank level
+                local id = math.floor(d.cc/16)+1
+                bank[id].global_level = util.clamp(bank[id].global_level+(d.val == 63 and (d.ch == 1 and -0.01 or -0.001) or (d.ch == 1 and 0.01 or 0.001)),0,2)
+                if bank[id][check_focus_hold(id)].envelope_mode == 2 or bank[id][check_focus_hold(id)].enveloped == false then
+                  if bank[id].focus_hold == false then
+                    softcut.level_slew_time(id+1,1.0)
+                    softcut.level(id+1,bank[id][check_focus_hold(id)].level*bank[id].global_level)
+                    softcut.level_cut_cut(id+1,5,(bank[id][check_focus_hold(id)].left_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
+                    softcut.level_cut_cut(id+1,6,(bank[id][check_focus_hold(id)].right_delay_level*bank[id][check_focus_hold(id)].level)*bank[id].global_level)
+                  end
                 end
-              elseif d.ch == 1 then
-                if slew_counter[id] ~= nil then
-                  slew_counter[id].prev_tilt = bank[id][bank[id].id].tilt
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"bank_level")
+              elseif d.cc == 6 or d.cc == 22 or d.cc == 38 then
+                --pad semitones
+                local id = math.floor(d.cc/16)+1
+                local current_offset = (math.log(bank[id][check_focus_hold(id)].offset)/math.log(0.5))*-12
+                current_offset = util.clamp(current_offset+(d.val == 63 and -1 or 1)/32,-1,1)
+                if current_offset > -0.0001 and current_offset < 0.0001 then
+                  current_offset = 0
                 end
-                for j = 1,16 do
-                  bank[id][j].tilt = util.clamp(bank[id][j].tilt+(d.val == 63 and -0.01 or 0.01),-1,1)
+                bank[id][check_focus_hold(id)].offset = math.pow(0.5, -current_offset / 12)
+                if d.ch == 5 then
+                  local this_pad = check_focus_hold(id)
+                  for i = 1,16 do
+                    bank[id][i].offset = bank[id][check_focus_hold(id)].offset
+                  end
+                end
+                if bank[id][check_focus_hold(id)].pause == false and bank[id].id == check_focus_hold(id) then
+                  if bank[id].focus_hold == false then
+                    softcut.rate(id+1, bank[id][check_focus_hold(id)].rate*bank[id][check_focus_hold(id)].offset)
+                  end
+                end
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_offset")
+              elseif d.cc == 7 or d.cc == 23 or d.cc == 39 then
+                --pad rate
+                local id = math.floor(d.cc/16)+1
+                local rates ={-4,-2,-1,-0.5,-0.25,-0.125,0,0.125,0.25,0.5,1,2,4}
+                if bank[id][check_focus_hold(id)].fifth then
+                  bank[id][check_focus_hold(id)].fifth = false
+                end
+                if tab.key(rates,bank[id][check_focus_hold(id)].rate) == nil then
+                  bank[id][check_focus_hold(id)].rate = 1
+                end
+                bank[id][check_focus_hold(id)].rate = rates[util.clamp(tab.key(rates,bank[id][check_focus_hold(id)].rate)+(d.val == 63 and -1 or 1),1,#rates)]
+                if d.ch == 5 then
+                  local this_pad = check_focus_hold(id)
+                  for i = 1,16 do
+                    bank[id][i].rate = bank[id][check_focus_hold(id)].rate
+                  end
+                end
+                if bank[id][check_focus_hold(id)].pause == false and bank[id].id == check_focus_hold(id) then
+                  if bank[id].focus_hold == false then
+                    softcut.rate(id+1, bank[id][check_focus_hold(id)].rate*bank[id][check_focus_hold(id)].offset)
+                  end
+                end
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"pad_rate")
+              elseif d.cc == 8 or d.cc == 24 or d.cc == 40 then
+                --pad / bank pan
+                local id = math.floor(d.cc/16)+1
+                if d.ch == 5 then
+                  local pre_pan = bank[id][check_focus_hold(id)].pan
+                  for i = 1,16 do
+                    bank[id][i].pan = util.clamp(pre_pan+(d.val == 63 and -0.01 or 0.01),-1,1)
+                  end
+                elseif d.ch == 1 then
+                  bank[id][check_focus_hold(id)].pan = util.clamp(bank[id][check_focus_hold(id)].pan+(d.val == 63 and -0.01 or 0.01),-1,1)
+                end
+                softcut.pan(id+1, bank[id][check_focus_hold(id)].pan)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"pan")
+              elseif d.cc == 10 or d.cc == 26 or d.cc == 42 then
+                --bank / pad filter cutoff
+                local id = math.floor(d.cc/16)+1
+                if d.ch == 5 then
+                  if slew_counter[id] ~= nil then
+                    slew_counter[id].prev_tilt = bank[id][check_focus_hold(id)].tilt
+                  end
+                  bank[id][check_focus_hold(id)].tilt = util.clamp(bank[id][check_focus_hold(id)].tilt+(d.val == 63 and -0.01 or 0.01),-1,1)
                   if d.val == 63 then
-                    if util.round(bank[id][j].tilt*100) < 0 and util.round(bank[id][j].tilt*100) > -9 then
-                      bank[id][j].tilt = -0.10
-                    elseif util.round(bank[id][j].tilt*100) > 0 and util.round(bank[id][j].tilt*100) < 32 then
-                      bank[id][j].tilt = 0.0
+                    if util.round(bank[id][check_focus_hold(id)].tilt*100) < 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) > -9 then
+                      bank[id][check_focus_hold(id)].tilt = -0.10
+                    elseif util.round(bank[id][check_focus_hold(id)].tilt*100) > 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) < 32 then
+                      bank[id][check_focus_hold(id)].tilt = 0.0
                     end
-                  elseif d.val == 65 and util.round(bank[id][j].tilt*100) > 0 and util.round(bank[id][j].tilt*100) < 32 then
-                    bank[id][j].tilt = 0.32
+                  elseif d.val == 65 and util.round(bank[id][check_focus_hold(id)].tilt*100) > 0 and util.round(bank[id][check_focus_hold(id)].tilt*100) < 32 then
+                    bank[id][check_focus_hold(id)].tilt = 0.32
+                  end
+                  if bank[id].focus_hold == false then
+                    slew_filter(id,slew_counter[id].prev_tilt,bank[id][check_focus_hold(id)].tilt,bank[id][check_focus_hold(id)].q,bank[id][check_focus_hold(id)].q,15)
+                  end
+                elseif d.ch == 1 then
+                  if slew_counter[id] ~= nil then
+                    slew_counter[id].prev_tilt = bank[id][bank[id].id].tilt
+                  end
+                  for j = 1,16 do
+                    bank[id][j].tilt = util.clamp(bank[id][j].tilt+(d.val == 63 and -0.01 or 0.01),-1,1)
+                    if d.val == 63 then
+                      if util.round(bank[id][j].tilt*100) < 0 and util.round(bank[id][j].tilt*100) > -9 then
+                        bank[id][j].tilt = -0.10
+                      elseif util.round(bank[id][j].tilt*100) > 0 and util.round(bank[id][j].tilt*100) < 32 then
+                        bank[id][j].tilt = 0.0
+                      end
+                    elseif d.val == 65 and util.round(bank[id][j].tilt*100) > 0 and util.round(bank[id][j].tilt*100) < 32 then
+                      bank[id][j].tilt = 0.32
+                    end
+                  end
+                  if bank[id].focus_hold == false then
+                    slew_filter(id,slew_counter[id].prev_tilt,bank[id][bank[id].id].tilt,bank[id][bank[id].id].q,bank[id][bank[id].id].q,15)
                   end
                 end
-                if bank[id].focus_hold == false then
-                  slew_filter(id,slew_counter[id].prev_tilt,bank[id][bank[id].id].tilt,bank[id][bank[id].id].q,bank[id][bank[id].id].q,15)
-                end
-              end
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"filter_tilt")
-            elseif d.cc == 11 or d.cc == 27 or d.cc == 43 then
-              --bank / pad filter q
-              local id = math.floor(d.cc/16)+1
-              params:delta("filter "..id.." q",(d.val == 63 and -0.5 or 0.5)*-1)
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"filter_q")
-            elseif d.cc == 12 or d.cc == 28 or d.cc == 44 then
-              -- pad / bank L delay send
-              local id = math.floor(d.cc/16)+1
-              local k = 3
-              local v = d.cc == 12 and 1 or (d.cc == 28 and 3 or 5)
-              local target = bank[id]
-              local prm = {"left_delay_level","right_delay_level"}
-              if d.ch == 5 then
-                for i = 1,16 do
-                  target[i][prm[1]] = util.clamp(target[i][prm[1]] + (d.val == 63 and -0.1 or 0.1),0,1)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"filter_tilt")
+              elseif d.cc == 11 or d.cc == 27 or d.cc == 43 then
+                --bank / pad filter q
+                local id = math.floor(d.cc/16)+1
+                params:delta("filter "..id.." q",(d.val == 63 and -0.5 or 0.5)*-1)
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"filter_q")
+              elseif d.cc == 12 or d.cc == 28 or d.cc == 44 then
+                -- pad / bank L delay send
+                local id = math.floor(d.cc/16)+1
+                local k = 3
+                local v = d.cc == 12 and 1 or (d.cc == 28 and 3 or 5)
+                local target = bank[id]
+                local prm = {"left_delay_level","right_delay_level"}
+                if d.ch == 5 then
+                  for i = 1,16 do
+                    target[i][prm[1]] = util.clamp(target[i][prm[1]] + (d.val == 63 and -0.1 or 0.1),0,1)
+                    if delay_links[del.lookup_prm(k,v)] then
+                      target[i][prm[1 == 1 and 2 or 1]] = target[i][prm[1]]
+                    end
+                  end
+                elseif d.ch == 1 then
+                  target[check_focus_hold(id)][prm[1]] = util.clamp(target[check_focus_hold(id)][prm[1]] + d/10,0,1)
                   if delay_links[del.lookup_prm(k,v)] then
-                    target[i][prm[1 == 1 and 2 or 1]] = target[i][prm[1]]
+                    target[check_focus_hold(id)][prm[1 == 1 and 2 or 1]] = target[check_focus_hold(id)][prm[1]]
                   end
                 end
-              elseif d.ch == 1 then
-                target[check_focus_hold(id)][prm[1]] = util.clamp(target[check_focus_hold(id)][prm[1]] + d/10,0,1)
-                if delay_links[del.lookup_prm(k,v)] then
-                  target[check_focus_hold(id)][prm[1 == 1 and 2 or 1]] = target[check_focus_hold(id)][prm[1]]
+                grid_dirty = true
+                if target[check_focus_hold(id)].enveloped == false then
+                  softcut.level_cut_cut(util.round(item/2)+1,1+4,(target[check_focus_hold(id)][prm[1]]*target[check_focus_hold(id)].level)*target.global_level)
+                  if delay_links[del.lookup_prm(k,v)] then
+                    local this_one = 1 == 1 and 2 or 1
+                    softcut.level_cut_cut(util.round(item/2)+1,(this_one)+4,(target[check_focus_hold(id)][prm[this_one]]*target[check_focus_hold(id)].level)*target.global_level)
+                  end
                 end
               end
-              grid_dirty = true
-              if target[check_focus_hold(id)].enveloped == false then
-                softcut.level_cut_cut(util.round(item/2)+1,1+4,(target[check_focus_hold(id)][prm[1]]*target[check_focus_hold(id)].level)*target.global_level)
-                if delay_links[del.lookup_prm(k,v)] then
-                  local this_one = 1 == 1 and 2 or 1
-                  softcut.level_cut_cut(util.round(item/2)+1,(this_one)+4,(target[check_focus_hold(id)][prm[this_one]]*target[check_focus_hold(id)].level)*target.global_level)
-                end
+            elseif d.ch == 2 then
+              if d.cc == 0 or d.cc == 16 or d.cc == 32 then
+                local id = math.floor(d.cc/16)+1
+                bank[id].focus_hold = d.val == 127 and true or false
+                mc.mft_redraw(bank[id][check_focus_hold(id)],"all")
+                grid_dirty = true
               end
-            end
-          elseif d.ch == 2 then
-            if d.cc == 0 or d.cc == 16 or d.cc == 32 then
-              local id = math.floor(d.cc/16)+1
-              bank[id].focus_hold = d.val == 127 and true or false
-              mc.mft_redraw(bank[id][check_focus_hold(id)],"all")
-              grid_dirty = true
-            end
-          elseif d.ch == 4 then
-            if d.val == 127 then
-              if d.cc == 0 or d.cc == 1 or d.cc == 2 then
-                mc.mft_redraw(bank[d.cc+1][check_focus_hold(d.cc+1)],"all")
+            elseif d.ch == 4 then
+              if d.val == 127 then
+                if d.cc == 0 or d.cc == 1 or d.cc == 2 then
+                  mc.mft_redraw(bank[d.cc+1][check_focus_hold(d.cc+1)],"all")
+                end
               end
             end
           end
+          
         end
-        
       end
     end
+
   end
 
   midi_alt = false
@@ -3927,7 +3937,13 @@ function redraw()
 end
 
 --GRID
-g = grid.connect()
+--ben
+--g = grid.connect()
+g = push.connect()
+g:all(g.RGB_BLACK)
+
+g.modifier = 0
+g.encoder_bank = 0
 
 function get_grid_connected()
   if g.device == nil and grid == nil then
@@ -3944,8 +3960,120 @@ function grid.add(dev)
 end
 
 g.key = function(x,y,z)
+  --print(x,y,z)
   grid_actions.init(x,y,z)
 end
+
+g.enc = function(id,val)
+  local function check_focus_hold(id)
+    if bank[id].focus_hold == true then
+      return bank[id].focus_pad
+    else
+      return bank[id].id
+    end
+  end
+
+  local b = bank_64
+
+  if g.encoder_bank == 0 then
+    if id == 2 then
+      --   pad start point
+      local resolution = loop_enc_resolution[b] / 10
+      encoder_actions.move_start(
+        bank[b][check_focus_hold(b)], 
+        (val == -1 and (g.modifier == 1 and -0.01 or -0.1) or (g.modifier == 1 and 0.01 or 0.1))/resolution)
+
+      if bank[b].focus_hold == false then
+        encoder_actions.sc.move_start(b)
+      end
+    elseif id == 3 then
+      -- pad end point
+      local resolution = loop_enc_resolution[b] / 10
+      encoder_actions.move_end(
+        bank[b][check_focus_hold(b)], 
+        (val == -1 and (g.modifier == 1 and -0.01 or -0.1) or (g.modifier == 1 and 0.01 or 0.1))/resolution)
+
+      if bank[b].focus_hold == false then
+        encoder_actions.sc.move_end(b)
+      end
+    elseif id == 4 then
+      -- pad window
+      local resolution = loop_enc_resolution[b] / 10
+      encoder_actions.move_play_window(
+        bank[b][check_focus_hold(b)], 
+        (val == -1 and (g.modifier == 1 and -0.01 or -0.1) or (g.modifier == 1 and 0.01 or 0.1))/resolution)
+      if bank[b].focus_hold == false then
+        encoder_actions.sc.move_play_window(b)
+      end
+    elseif id == 5 then
+      --pad level
+      bank[b][check_focus_hold(b)].level = util.clamp(bank[b][check_focus_hold(b)].level+(val == -1 and (g.modifier == 1 and -0.001 or -0.01) or (g.modifier == 1 and 0.001 or 0.01)),0,2)
+      if bank[b][check_focus_hold(b)].envelope_mode == 2 or bank[b][check_focus_hold(b)].enveloped == false then
+        if bank[b].focus_hold == false then
+          softcut.level_slew_time(b+1,1.0)
+          softcut.level(b+1,bank[b][check_focus_hold(b)].level*bank[b].global_level)
+          softcut.level_cut_cut(b+1,5,(bank[b][check_focus_hold(b)].left_delay_level*bank[b][check_focus_hold(b)].level)*bank[b].global_level)
+          softcut.level_cut_cut(b+1,6,(bank[b][check_focus_hold(b)].right_delay_level*bank[b][check_focus_hold(b)].level)*bank[b].global_level)
+        end
+      end
+    elseif id == 6 then
+      --bank level
+      bank[b].global_level = util.clamp(bank[b].global_level+(val == -1 and (g.modifier == 1 and -0.001 or -0.01) or (g.modifier == 1 and 0.001 or 0.01)),0,2)
+      if bank[b][check_focus_hold(b)].envelope_mode == 2 or bank[b][check_focus_hold(b)].enveloped == false then
+        if bank[b].focus_hold == false then
+          softcut.level_slew_time(b+1,1.0)
+          softcut.level(b+1,bank[b][check_focus_hold(b)].level*bank[b].global_level)
+          softcut.level_cut_cut(b+1,5,(bank[b][check_focus_hold(b)].left_delay_level*bank[b][check_focus_hold(b)].level)*bank[b].global_level)
+          softcut.level_cut_cut(b+1,6,(bank[b][check_focus_hold(b)].right_delay_level*bank[b][check_focus_hold(b)].level)*bank[b].global_level)
+        end
+      end
+    elseif id == 7 then
+      --pad / bank pan
+      if g.modifier then
+        local pre_pan = bank[b][check_focus_hold(b)].pan
+        for i = 1,16 do
+          bank[b][i].pan = util.clamp(pre_pan+(val == -1 and 0.01 or -0.01),-1,1)
+        end
+      else
+        bank[b][check_focus_hold(b)].pan = util.clamp(bank[b][check_focus_hold(b)].pan+(val == -1 and 0.01 or -0.01),-1,1)
+      end
+      softcut.pan(b+1, bank[b][check_focus_hold(b)].pan)
+    elseif id == 8 then
+      --pad semitones
+      local current_offset = (math.log(bank[b][check_focus_hold(b)].offset)/math.log(0.5))*-12
+      current_offset = util.clamp(current_offset+(val == -1 and -1 or 1)/32,-1,1)
+      if current_offset > -0.0001 and current_offset < 0.0001 then
+        current_offset = 0
+      end
+      bank[b][check_focus_hold(b)].offset = math.pow(0.5, -current_offset / 12)
+      if d.ch == 8 then
+        local this_pad = check_focus_hold(id)
+        for i = 1,16 do
+          bank[b][i].offset = bank[b][check_focus_hold(b)].offset
+        end
+      end
+      if bank[b][check_focus_hold(b)].pause == false and bank[b].id == check_focus_hold(b) then
+        if bank[b].focus_hold == false then
+          softcut.rate(b+1, bank[b][check_focus_hold(b)].rate*bank[b][check_focus_hold(b)].offset)
+        end
+      end
+    elseif id == 9 then
+    end
+  end
+end
+
+g.button = function(id,val)
+  if id == 8 then
+    -- set modifier
+    g.modifier = val
+  end
+  g:set_button(id, g.RGB_WHITE*val) -- enable LED if pressed
+end
+
+-- p.key = function(x,y,z)
+--   print(x,y,z)
+--   push_actions.init(x,y,z)
+-- end
 
 function jump_live(i,s,y,z)
 
@@ -4079,83 +4207,85 @@ function grid_entry(e)
 end
 
 led_maps =
---                    {   VB,4S,GS  }
+--                    {   VB,4S,GS, PUSH  }
 {
   -- main page
-  ["square_off"]          =   {3,4,15}
-  , ["square_selected"]   =   {15,15,0}
-  , ["square_dim"]        =   {5,8,0}
-  , ["zilchmo_off"]       =   {3,4,15} -- is this right?
-  , ["zilchmo_on"]        =   {15,12,0}
-  , ["pad_pause"]         =   {15,12,15}
-  , ["pad_play"]          =   {3,4,0}
-  , ["rec_record"]        =   {9,8,15}
-  , ["rec_overdub"]       =   {9,8,15}
-  , ["rec_play"]          =   {15,12,15}
-  , ["rec_pause"]         =   {5,4,0}
-  , ["rec_off"]           =   {3,0,0}
-  , ["arc_rec_rec"]       =   {15,12,15}
-  , ["arc_rec_play"]      =   {9,8,15}
-  , ["arc_rec_pause"]     =   {5,4,0}
-  , ["arc_rec_off"]       =   {0,0,0}
-  , ["arc_param_show"]    =   {5,4,0}
-  , ["grid_alt_on"]       =   {15,12,15}
-  , ["grid_alt_off"]      =   {3,4,0}
-  , ["clip"]              =   {8,8,15}
-  , ["mode"]              =   {6,8,15}
-  , ["loop_on"]           =   {4,8,15}
-  , ["loop_off"]          =   {2,4,0}
-  , ["arp_on"]            =   {4,4,0}
-  , ["arp_pause"]         =   {4,8,15}
-  , ["arp_play"]          =   {10,12,15}
-  , ["live_empty"]        =   {3,4,0}
-  , ["live_rec"]          =   {10,12,15}
-  , ["live_pause"]        =   {5,8,0}
-  , ["alt_on"]            =   {15,12,15}
-  , ["alt_off"]           =   {3,4,0}
-  , ["focus_on"]          =   {10,8,15}
+  ["square_off"]          =   {3,4,15, g.RGB_WHITE}
+  , ["square_selected"]   =   {15,15,0, g.RGB_WHITE}
+  , ["square_dim"]        =   {5,8,0, g.RGB_LIGHT_GRAY}
+  , ["zilchmo_off"]       =   {3,4,15, g.RGB_DARK_GRAY} -- is this right?
+  , ["zilchmo_on"]        =   {15,12,0, g.RGB_BLUE}
+  , ["pad_pause"]         =   {15,12,15, g.RGB_BLUE}
+  , ["pad_play"]          =   {3,4,0, g.RGB_DARK_GRAY}
+  , ["rec_record"]        =   {9,8,15, g.RGB_LIGHT_GRAY}
+  , ["rec_overdub"]       =   {9,8,15, g.RGB_LIGHT_GRAY}
+  , ["rec_play"]          =   {15,12,15, g.RGB_BLUE}
+  , ["rec_pause"]         =   {5,4,0, g.RGB_DARK_GRAY}
+  , ["rec_off"]           =   {3,0,0, g.RGB_BLACK}
+  , ["arc_rec_rec"]       =   {15,12,15, g.RGB_BLUE}
+  , ["arc_rec_play"]      =   {9,8,15, g.RGB_LIGHT_GRAY}
+  , ["arc_rec_pause"]     =   {5,4,0, g.RGB_DARK_GRAY}
+  , ["arc_rec_off"]       =   {0,0,0, g.RGB_BLACK}
+  , ["arc_param_show"]    =   {5,4,0, g.RGB_DARK_GRAY}
+  , ["grid_alt_on"]       =   {15,12,15, g.RGB_BLUE}
+  , ["grid_alt_off"]      =   {3,4,0, g.RGB_DARK_GRAY}
+  , ["clip"]              =   {8,8,15, g.RGB_LIGHT_GRAY}
+  , ["mode"]              =   {6,8,15, g.RGB_LIGHT_GRAY}
+  , ["loop_on"]           =   {4,8,15, g.RGB_LIGHT_GRAY}
+  , ["loop_off"]          =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["arp_on"]            =   {4,4,0, g.RGB_DARK_GRAY}
+  , ["arp_pause"]         =   {4,8,15, g.RGB_LIGHT_GRAY}
+  , ["arp_play"]          =   {10,12,15, g.RGB_BLUE}
+  , ["live_empty"]        =   {3,4,0, g.RGB_DARK_GRAY}
+  , ["live_rec"]          =   {10,12,15, g.RGB_BLUE}
+  , ["live_pause"]        =   {5,8,0, g.RGB_LIGHT_GRAY}
+  , ["alt_on"]            =   {15,12,15, g.RGB_BLUE}
+  , ["alt_off"]           =   {3,4,0, g.RGB_DARK_GRAY}
+  , ["focus_on"]          =   {10,8,15, g.RGB_LIGHT_GRAY}
   -- , ["focus_soft"]        =   {10,8,15}
 
   -- seq page
-  , ["step_no_data"]      =   {2,4,0}
-  , ["step_yes_data"]     =   {4,8,15}
-  , ["step_loops"]        =   {4,8,15}
-  , ["slot_saved"]        =   {7,8,0}
-  , ["slot_empty"]        =   {2,4,0}
-  , ["slot_loaded"]       =   {15,15,15}
-  , ["step_current"]      =   {15,15,15}
-  , ["step_held"]         =   {9,8,15}
-  , ["loop_duration"]     =   {4,4,0}
-  , ["meta_duration"]     =   {4,4,15}
-  , ["meta_step_hi"]      =   {6,8,15}
-  , ["meta_step_lo"]      =   {2,4,0}
-  , ["loop_mod_hi"]       =   {12,12,15}
-  , ["loop_mod_lo"]       =   {3,4,0}
+  , ["step_no_data"]      =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["step_yes_data"]     =   {4,8,15, g.RGB_LIGHT_GRAY}
+  , ["step_loops"]        =   {4,8,15, g.RGB_LIGHT_GRAY}
+  , ["slot_saved"]        =   {7,8,0, g.RGB_LIGHT_GRAY}
+  , ["slot_empty"]        =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["slot_loaded"]       =   {15,15,15, g.RGB_WHITE}
+  , ["step_current"]      =   {15,15,15, g.RGB_WHITE}
+  , ["step_held"]         =   {9,8,15, g.RGB_LIGHT_GRAY}
+  , ["loop_duration"]     =   {4,4,0, g.RGB_DARK_GRAY}
+  , ["meta_duration"]     =   {4,4,15, g.RGB_DARK_GRAY}
+  , ["meta_step_hi"]      =   {6,8,15, g.RGB_LIGHT_GRAY}
+  , ["meta_step_lo"]      =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["loop_mod_hi"]       =   {12,12,15, g.RGB_BLUE}
+  , ["loop_mod_lo"]       =   {3,4,0, g.RGB_DARK_GRAY}
 
   -- delay page
-  , ["bundle_empty"]      =   {2,4,0}
-  , ["bundle_saved"]      =   {7,8,0}
-  , ["bundle_loaded"]     =   {15,12,15}
-  , ["time_to_led.5"]     =   {5,4,15}
-  , ["time_to_led.25"]    =   {10,8,15}
-  , ["time_to_led.125"]   =   {15,12,15}
-  , ["time_to_led2"]      =   {3,4,15}
-  , ["time_to_led4"]      =   {6,8,15}
-  , ["time_to_led8"]      =   {12,12,15}
-  , ["time_to_led16"]     =   {15,12,15}
-  , ["reverse_on"]        =   {7,8,15}
-  , ["reverse_off"]       =   {3,4,0}
-  , ["wobble_on"]         =   {15,12,15}
-  , ["wobble_off"]        =   {0,0,0}
-  , ["level_lo"]          =   {2,4,0}
-  , ["level_hi"]          =   {7,8,15}
-  , ["selected_bank"]     =   {7,8,15}
-  , ["unselected_bank"]   =   {2,4,0}
-  , ["64_bank_send"]      =   {4,8,15}
+  , ["bundle_empty"]      =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["bundle_saved"]      =   {7,8,0, g.RGB_LIGHT_GRAY}
+  , ["bundle_loaded"]     =   {15,12,15, g.RGB_BLUE}
+  , ["time_to_led.5"]     =   {5,4,15, g.RGB_DARK_GRAY}
+  , ["time_to_led.25"]    =   {10,8,15, g.RGB_LIGHT_GRAY}
+  , ["time_to_led.125"]   =   {15,12,15, g.RGB_BLUE}
+  , ["time_to_led2"]      =   {3,4,15, g.RGB_DARK_GRAY}
+  , ["time_to_led4"]      =   {6,8,15, g.RGB_DARK_GRAY}
+  , ["time_to_led8"]      =   {12,12,15, g.RGB_BLUE}
+  , ["time_to_led16"]     =   {15,12,15, g.RGB_BLUE}
+  , ["reverse_on"]        =   {7,8,15, g.RGB_LIGHT_GRAY}
+  , ["reverse_off"]       =   {3,4,0, g.RGB_DARK_GRAY}
+  , ["wobble_on"]         =   {15,12,15, g.RGB_BLUE}
+  , ["wobble_off"]        =   {0,0,0, g.RGB_BLACK}
+  , ["level_lo"]          =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["level_hi"]          =   {7,8,15, g.RGB_LIGHT_GRAY}
+  , ["selected_bank"]     =   {7,8,15, g.RGB_LIGHT_GRAY}
+  , ["unselected_bank"]   =   {2,4,0, g.RGB_DARK_GRAY}
+  , ["64_bank_send"]      =   {4,8,15, g.RGB_LIGHT_GRAY}
   
   -- misc
-  , ["page_led"]          =   {{0,0,15},{7,8,15},{15,12,15}}
-  , ["off"]               =   {0,0,0}
+  , ["page_led"]          =   {{0,0,15, g.RGB_BLACK},
+                               {7,8,15, g.RGB_LIGHT_GRAY},
+                               {15,12,15, g.RGB_BLUE}}
+  , ["off"]               =   {0,0,0, g.RGB_BLACK}
 }
 
 function draw_zilch(x,y,z)
@@ -4168,7 +4298,6 @@ function grid_redraw()
     if params:string("grid_size") == "128" then
       g:all(0)
       local edition = params:get("LED_style")
-      
       if grid_page == 0 then
         
         for j = 0,2 do
@@ -4232,9 +4361,9 @@ function grid_redraw()
         if a.device ~= nil then
           for i = 1,3 do
             for j = 5,15,5 do
-              g:led(j,8,arc_param[j/5] == 1 and 5 or 0)
-              g:led(j,7,arc_param[j/5] == 2 and 5 or 0)
-              g:led(j,6,arc_param[j/5] == 3 and 5 or 0)
+              g:led(j,8,arc_param[j/5] == 1 and 5 or g.RGB_BLACK)
+              g:led(j,7,arc_param[j/5] == 2 and 5 or g.RGB_BLACK)
+              g:led(j,6,arc_param[j/5] == 3 and 5 or g.RGB_BLACK)
               if arc_param[j/5] == 4 then
                 for k = 8,6,-1 do
                   g:led(j,k,led_maps["arc_param_show"][edition])
@@ -4290,8 +4419,11 @@ function grid_redraw()
           --   local alt = bank[i].alt_lock and 1 or 0
           --   g:led(5*i,5,15*alt)
           -- end
-          local alt = bank[i].alt_lock and 1 or 0
-          g:led(5*i,5,15*alt)
+          if bank[i].alt_lock then
+            g:led(5*i,5,g.RGB_WHITE)
+          else 
+            g:led(5*i,5,g.RGB_BLACK)
+          end
         end
         
         for i,e in pairs(lit) do
@@ -4406,8 +4538,8 @@ function grid_redraw()
         for i = 1,8 do
           local check = {i+8, i}
           for j = 1,2 do
-            g:led(i,j,delay[2].selected_bundle == check[j] and 15 or (delay_bundle[2][check[j]].saved == true and led_maps["bundle_saved"][edition] or led_maps["bundle_empty"][edition]))
-            g:led(i,j+6,delay[1].selected_bundle == check[j] and 15 or (delay_bundle[1][check[j]].saved == true and led_maps["bundle_saved"][edition] or led_maps["bundle_empty"][edition]))
+            g:led(i,j,delay[2].selected_bundle == check[j] and g.RGB_WHITE or (delay_bundle[2][check[j]].saved == true and led_maps["bundle_saved"][edition] or led_maps["bundle_empty"][edition]))
+            g:led(i,j+6,delay[1].selected_bundle == check[j] and g.RGB_WHITE or (delay_bundle[1][check[j]].saved == true and led_maps["bundle_saved"][edition] or led_maps["bundle_empty"][edition]))
           end
         end
 
@@ -4433,6 +4565,7 @@ function grid_redraw()
             time_to_led[i] = led_maps["time_to_led16"][edition]
           end
         end
+        --ben
         g:led(1,3,time_to_led[2])
         g:led(2,3,time_to_led[4])
         g:led(1,6,time_to_led[1])
@@ -4618,15 +4751,17 @@ function grid_redraw()
 
     --64 grid / grid 64
     elseif params:string("grid_size") == "64" then
-      g:all(0)
+      --g:all(0)
+      g:all(g.RGB_BLACK)
       local edition = params:get("LED_style")
-
+     -- ben
       g:led(8,1,led_maps["square_off"][edition])
       
       if grid_page_64 == 0 then
 
         for x = 1,3 do
-          g:led(x,1,x == bank_64 and 12 or 4)
+          --g:led(x,1,x == bank_64 and 12 or 4)
+          g:led(x,1,x == bank_64 and g.RGB_BLUE or g.RGB_DARK_GRAY)
         end
 
         --arc recorders
@@ -4668,14 +4803,18 @@ function grid_redraw()
           g:led(8,5,(9*target.led))
         elseif (target.quantize == 0 and target.play == 1) or (target.quantize == 1 and target.tightened_start == 1) then
           if target.overdub == 0 then
-            g:led(8,5,9)
+            --g:led(8,5,9)
+            g:led(8,5,g.RGB_GREEN)
           else
-            g:led(8,5,15)
+            --g:led(8,5,15)
+            g:led(8,5,g.RGB_WHITE)
           end
         elseif target.count > 0 then
-          g:led(8,5,5)
+          --g:led(8,5,5)
+          g:led(8,5,g.RGB_DARK_GRAY)
         else
-          g:led(8,5,3)
+          --g:led(8,5,3)
+          g:led(8,5,g.RGB_DARK_GRAY)
         end
         
         --arc rec
@@ -4745,9 +4884,14 @@ function grid_redraw()
         if bank[bank_64].focus_hold then
           g:led(5,7,(10*bank[bank_64][bank[bank_64].focus_pad].crow_pad_execute)+5)
         end
-        local alt = bank[bank_64].alt_lock and 1 or 0
-        g:led(4,8,15*alt)
-        
+        --local alt = bank[bank_64].alt_lock and 1 or 0
+        --g:led(4,8,15*alt)
+        if bank[bank_64].alt_lock then
+          g:led(4,8,g.RGB_WHITE)
+        else
+          g:led(4,8,g.RGB_BLACK)
+        end
+
         -- for i,e in pairs(lit) do
         --   g:led(e.x, e.y,led_maps["zilchmo_on"][edition])
         -- end
@@ -5139,8 +5283,8 @@ arc_redraw = function()
       local end_to_led = math.floor(util.linlin(minimum,maximum,1,64,bank[arc_control[i]][which_pad].end_point))
       local playhead_to_led = util.linlin(minimum,maximum,1,64,poll_position_new[i+1])
       a:led(i,(math.floor(playhead_to_led))+16,5)
-      a:led(i, arc_param[i] == 2 and (start_to_led+16) or (end_to_led+17),15)
-      a:led(i, arc_param[i] == 2 and (end_to_led+17) or (start_to_led+16),8)
+      a:led(i, arc_param[i] == 2 and (start_to_led+16) or (end_to_led+17),g.RGB_WHITE)
+      a:led(i, arc_param[i] == 2 and (end_to_led+17) or (start_to_led+16),g.RGB_LIGHT_GRAY)
 
     end
     if arc_param[i] == 4 then
@@ -5693,17 +5837,17 @@ function test_save(i)
         save_pattern(i,pattern_saver[i].save_slot+8*(i-1),"pattern")
         pattern_saver[i].saved[pattern_saver[i].save_slot] = 1
         pattern_saver[i].load_slot = pattern_saver[i].save_slot
-        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,15)
+        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,g.RGB_WHITE)
         -- g:refresh()
       elseif #arp[i].notes > 0 then
         save_pattern(i,pattern_saver[i].save_slot+8*(i-1),"arp")
         pattern_saver[i].saved[pattern_saver[i].save_slot] = 1
         pattern_saver[i].load_slot = pattern_saver[i].save_slot
-        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,15)
+        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,g.RGB_WHITE)
         -- g:refresh()
       else
         print("no pattern data to save")
-        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,0)
+        g:led(math.floor((i-1)*5)+1,9-pattern_saver[i].save_slot,g.RGB_BLACK)
         -- g:refresh()
       end
       pattern_saver[i].clock = nil
